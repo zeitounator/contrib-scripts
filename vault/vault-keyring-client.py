@@ -16,11 +16,8 @@
 # The `keyring` Python module is required: https://pypi.org/project/keyring/
 #
 # By default, this script will store the specified password in the keyring of
-# the user that invokes the script. To specify a user keyring, add a [vault]
-# section to your ansible.cfg file with a 'username' option. Example:
-#
-# [vault]
-# username = 'ansible-vault'
+# the user that invokes the script. To specify a user keyring, pass the 
+# --username option to the script
 #
 # In useage like:
 #
@@ -47,6 +44,16 @@
 # ...
 # vault_password_file = /path/to/vault-keyring-client.py
 # ...
+# or in your environment
+# ```
+# export ANSIBLE_VAULT_PASSWORD_FILE=/path/to/vault-keyring-client.py
+#```
+#
+# Meanwhile if your intend to use several vault-id you should rather
+# set a vault identity list and let the above unset
+# ```
+# export ANSIBLE_VAULT_IDENTITY_LIST=vaultid1@/path/to/vault-keyring-client,vaultid2@/path/to/vault-keyring-client
+# ```
 #
 # To set your password, `cd` to your project directory and run:
 #
@@ -57,8 +64,8 @@
 #
 #  /path/to/vault-keyring-client.py --vault-id my_ansible_secret --set
 #
-# If you choose not to configure the path to `vault_password_file` in
-# ansible.cfg, your `ansible-playbook` command might look like:
+# If you choose not to configure the path to `vault_password_file` or
+# to set an identity list, you can invoke your playbook as follows:
 #
 # ansible-playbook --vault-id=keyring_id@/path/to/vault-keyring-client.py site.yml
 
@@ -70,18 +77,16 @@ import sys
 import getpass
 import keyring
 
-from ansible.config.manager import ConfigManager, get_ini_config_value
-
 KEYNAME_UNKNOWN_RC = 2
 
 
 def build_arg_parser():
     parser = argparse.ArgumentParser(description='Get a vault password from user keyring')
 
-    parser.add_argument('--vault-id', action='store', default=None,
+    parser.add_argument('--vault-id', action='store', default="ansible",
                         dest='vault_id',
                         help='name of the vault secret to get from keyring')
-    parser.add_argument('--username', action='store', default=None,
+    parser.add_argument('--username', action='store', default=getpass.getuser(),
                         help='the username whose keyring is queried')
     parser.add_argument('--set', action='store_true', default=False,
                         dest='set_password',
@@ -90,48 +95,31 @@ def build_arg_parser():
 
 
 def main():
-    # Set default values
-    username = getpass.getuser()
-    keyname = 'ansible'
-
-    # Try to load values from config if one exists
-    config = ConfigManager()
-    if config._config_file:
-        username = get_ini_config_value(
-            config._parsers[config._config_file],
-            dict(section='vault', key='username')
-        ) or username
-
-        keyname = get_ini_config_value(
-            config._parsers[config._config_file],
-            dict(section='vault', key='keyname')
-        ) or keyname
 
     # Read values from command line (which override the previous if given)
     arg_parser = build_arg_parser()
     args = arg_parser.parse_args()
 
-    username = args.username or username
-    keyname = args.vault_id or keyname
+    username = args.username
+    vault_id = args.vault_id
 
     if args.set_password:
         intro = 'Storing password in "{}" user keyring using key name: {}\n'
-        sys.stdout.write(intro.format(username, keyname))
+        sys.stdout.write(intro.format(username, vault_id))
         password = getpass.getpass()
         confirm = getpass.getpass('Confirm password: ')
         if password == confirm:
-            keyring.set_password(keyname, username, password)
+            keyring.set_password(vault_id, username, password)
         else:
             sys.stderr.write('Passwords do not match\n')
             sys.exit(1)
     else:
-        secret = keyring.get_password(keyname, username)
+        secret = keyring.get_password(vault_id, username)
         if secret is None:
             sys.stderr.write('vault-keyring-client could not find key="%s" for user="%s" via backend="%s"\n' %
-                             (keyname, username, keyring.get_keyring().name))
+                             (vault_id, username, keyring.get_keyring().name))
             sys.exit(KEYNAME_UNKNOWN_RC)
 
-        # print('secret: %s' % secret)
         sys.stdout.write('%s\n' % secret)
 
     sys.exit(0)
@@ -139,3 +127,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
