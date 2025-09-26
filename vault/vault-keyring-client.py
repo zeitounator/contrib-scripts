@@ -16,7 +16,7 @@
 # The `keyring` Python module is required: https://pypi.org/project/keyring/
 #
 # By default, this script will store the specified password in the keyring of
-# the user that invokes the script. To specify a user keyring, pass the 
+# the user that invokes the script. To specify a user keyring, pass the
 # --username option to the script
 #
 # In useage like:
@@ -47,7 +47,7 @@
 # or in your environment
 # ```
 # export ANSIBLE_VAULT_PASSWORD_FILE=/path/to/vault-keyring-client.py
-#```
+# ```
 #
 # Meanwhile if your intend to use several vault-id you should rather
 # set a vault identity list and let the above unset
@@ -127,4 +127,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
